@@ -7,24 +7,22 @@ import (
 	"strings"
 )
 
-func ExtractUrl(url string) (string, error) {
+func ExtractUrl(url string) ([]string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer func(Body io.ReadCloser) {
-		if cerr := Body.Close(); cerr != nil {
-			err = cerr // Присваиваем ошибку внешней переменной err
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			panic("Error while closing response body: " + cerr.Error())
 		}
-	}(resp.Body)
+	}()
 	content := extractText(resp.Body)
-	if err != nil {
-		return "", err // Возвращаем ошибку извлечения текста
-	}
+
 	return content, nil
 }
 
-func extractText(body io.Reader) string {
+func extractText(body io.Reader) []string {
 	tokenizer := html.NewTokenizer(body)
 	var textBuilder strings.Builder
 
@@ -33,13 +31,15 @@ func extractText(body io.Reader) string {
 
 		switch tokenType {
 		case html.ErrorToken:
-			return textBuilder.String()
+			// Используем strings.Fields для разделения текста на слова
+			return strings.Fields(textBuilder.String())
 		case html.TextToken:
 			text := strings.TrimSpace(html.UnescapeString(string(tokenizer.Text())))
 			if len(text) > 0 {
-				textBuilder.WriteString(text)
-				textBuilder.WriteString("\n")
+				textBuilder.WriteString(text + " ") // Добавляем пробел после каждого слова для корректного разделения
 			}
+		default:
+			// На случай, если встретится необработанный тип токена
 		}
 	}
 }
